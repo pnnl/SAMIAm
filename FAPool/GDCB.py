@@ -14,7 +14,6 @@ Created on Mon Mar 18 11:57:58 2019
 import torch
 import torch.nn as nn
 import math
-from torch.autograd import Variable
 
 class GDCB(nn.Module):
     def __init__(self,mfs_dim=25,nlv_bcd=6):

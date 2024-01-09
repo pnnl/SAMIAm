@@ -7,10 +7,7 @@
 import torch
 from torch.nn import Module, Parameter
 import torch.nn.functional as F
-from torch.autograd import Variable
-from torch.nn.modules.utils import _pair
-import encoding
-from encoding.functions import scaled_l2, aggregate, pairwise_cosine
+from encoding.functions import scaled_l2
 
 
 class PGB(Module):

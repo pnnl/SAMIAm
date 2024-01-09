@@ -7,7 +7,12 @@ __pycache__/
 /k_chips/
 /labels/
 /logs/
+/CHESS_Labeling_Round_1/
+/FOR_LABELING/
 *.png
 *.jpg
 *.tiff
 *.pth
+*.csv
+*.pyc
+*.zip

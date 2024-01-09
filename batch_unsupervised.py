@@ -41,10 +41,11 @@ class ChessDataset(Dataset):
 NOW = str(datetime.now()).replace(" ","--").split(".")[0]
 
 #Define default global variable values
+SAM = 'sam_vit_h_4b8939.pth'
 BATCH_SIZE = 1
-SUBSET_SIZE = 2
+SUBSET_SIZE = 32
 IDEAL_CHIP_SIZE = 60
-DATA_DIR = './chessdataset_limited/'
+DATA_DIR = './CHESS_Labeling_Round_1/12-15-23_Spurgeon_CHESS_Labeling_Round_1/dataset/' #'./FOR_LABELING/'  #'./chessdataset_limited/'
 OUTPUT_DIR = '/logs/' + NOW + '/'
 COPY_ORIGINAL_DATA = True
 OVERLAP = 90
@@ -58,11 +59,20 @@ STABILITY_SCORE_THRESH = 0.92
 CROP_N_POINTS_DOWNSCALE_FACTOR = 2
 
 
+
 if __name__ == '__main__':
+
+    #torch.cuda.empty_cache()
+    print("IN MAIN")
 
     args = get_args()
 
+    SAM = args.sam
+    POINTS_PER_SIDE = args.grid
+    IDEAL_CHIP_SIZE = args.chipsize
+
     OPTIONS = {
+    'SAM': SAM,
     'Image batch size': BATCH_SIZE,
     'Experiment data subset size': SUBSET_SIZE,
     'Ideal chip size': IDEAL_CHIP_SIZE,
@@ -89,8 +99,13 @@ if __name__ == '__main__':
     logger = get_logger()
 
     #sys.path.append(".")
-    sam_checkpoint = "sam_vit_h_4b8939.pth"
-    model_type = "vit_h"
+    sam_checkpoint = SAM
+    if 'vit_h' in SAM:
+        model_type = "vit_h"
+    elif 'vit_l' in SAM:
+        model_type = "vit_l"
+    elif 'vit_b' in SAM:
+        model_type = "vit_b"
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print("DEVICE:", device)
 
@@ -216,15 +231,78 @@ if __name__ == '__main__':
                      'STEM_JEOL_BF_12-17-20_Hematite_1_Unirrad_Uncapped19F070_LO_121719_Thinned_Followup_0007.tiff':5,
                      'STEM_JEOL_BF_12-17-20_Hematite_1_Unirrad_Uncapped19F070_LO_121719_Thinned_Followup_0013.tiff':5,
                      'STEM_JEOL_HAADF_04-27-17_13_nm_STO_p-Ge_033117_LO_110_042617_HAADF_0007.tiff':3,
-                     'STEM_JEOL_HAADF_05-02-17_5_uc_STO_p-Ge_033117_LO_110_051116_HAADF_0007.tiff':3
+                     'STEM_JEOL_HAADF_05-02-17_5_uc_STO_p-Ge_033117_LO_110_051116_HAADF_0007.tiff':3,
+                     'STEM_ADF_07-10-17 30 nm SrFeOx - LSAT 050517 LO 100 062217_0004.jpg':5,
+                     'STEM_ADF_09-24-18 50 nm LMO STO 081618 LO 091618_0009.jpg':2,
+                     'STEM_ADF_10-23-18 10 nm LFO-STO 120717-b LO 0 101218_0003.jpg':4,
+                     'STEM_JEOL ADF1_02-12-20 Wang 5-1 LFO - SNO - LSAT 120718-6 LO 0 020420_0001.jpg':3,
+                     'STEM_JEOL ADF1_03-08-21 Kaspar 30 Cr2O3 30 Fe3O4 012621A LO 21F010_0006_1':4,
+                     'STEM_JEOL ADF1_04-15-19 50 nm Fe2TiO4 - MgO 012419 LO 030519 Futher Polish_0018':3,
+                     'STEM_JEOL ADF1_04-15-19 50 nm Fe2TiO4 - MgO 012419 LO 030519 Futher Polish_0021':2,
+                     'STEM_JEOL ADF1_07-23-19 Du STO-Ge LO 45 071919_0010':3,
+                     'STEM_JEOL ADF2_07-06-20 Kaspar Hematite 1 Unirrad Uncapped 121719 19F070_0006_1':3,
+                     'STEM_JEOL HAADF_04-27-17 13 nm STO p-Ge 033117 LO 110 042617 HAADF_0007':3,
+                     'STO-Ge-HAADF':3
                      }
 
+    num_materials = {
+                    'STEM_ADF_11-02-18_10_nm_LFO-STO_A_LO_0_103118_0002': 3,
+                    'STEM_JEOL_HAADF_04-27-17_13_nm_STO_p-Ge_033117_LO_110_042617_HAADF_0001': 4,
+                    'STEM_JEOL_ADF1_02-20-20_Yingge_4nm_WO3_-_NbSTO_052617_LO_020620_0005': 3,
+                    'STEM_JEOL_ADF1_02-20-20_Yingge_4nm_WO3_-_NbSTO_052617_LO_020620_0001': 3,
+                    'STEM_JEOL_ADF1_10-12-20_La0.8Sr0.2FeO3-STO-080317-2-LO-zero-deg_0006_1': 6,
+                    'STEM_ADF_11-02-18_10_nm_LFO-STO_A_LO_0_103118_0001': 3,
+                    'STEM_JEOL_ADF1_02-20-20_Yingge_4nm_WO3_-_NbSTO_052617_LO_020620_0002': 3,
+                    'STEM_ADF_09-24-18_30_nm_LMO_STO_081317B_LO_091618_0004': 3,
+                    'STEM_JEOL_ADF1_06-29-20_Wangoh_LSTO_-_STO_0.25_TEM_012020_LO_0_031020_Thinner_0002': 4,
+                    'STEM_JEOL_ADF1_06-29-20_Wangoh_LSTO_-_STO_0.25_TEM_012020_LO_0_031020_Thinner_0004': 3,
+                    'STEM_JEOL_ADF1_03-16-20_Wangoh_LSTO_-_STO_0.25_TEM_012020_LO_0_031020_0001': 5,
+                    'STEM_JEOL_ADF1_10-12-20_La0.8Sr0.2FeO3-STO-080317-2-LO-zero-deg_0004_1': 6,
+                    'STEM_ADF_11-02-18_10_nm_LFO-STO_A_LO_0_103118_0004': 4,
+                    'STEM_JEOL_ADF1_03-16-20_Wangoh_LSTO_-_STO_0.25_TEM_012020_LO_0_031020_0002': 4,
+                    'STEM_JEOL_ADF1_10-12-20_La0.8Sr0.2FeO3-STO-080317-2-LO-zero-deg_0001_1': 5,
+                    'STEM_ADF_09-24-18_30_nm_LMO_STO_081317B_LO_091618_0006': 3,
+                    'STEM_ADF_09-24-18_30_nm_LMO_STO_081317B_LO_091618_0008': 3,
+                    'STEM_JEOL_ADF1_10-12-20_La0.8Sr0.2FeO3-STO-080317-2-LO-zero-deg_0005_1': 3,
+                    'STEM_ADF_09-24-18_30_nm_LMO_STO_081317B_LO_091618_0005': 3,
+                    'STEM_ADF_11-02-18_10_nm_LFO-STO_A_LO_0_103118_0003': 3,
+                    'STEM_JEOL_ADF1_06-29-20_Wangoh_LSTO_-_STO_0.25_TEM_012020_LO_0_031020_Thinner_0003_1': 4,
+                    'STEM_JEOL_HAADF_04-27-17_13_nm_STO_p-Ge_033117_LO_110_042617_HAADF_0005': 3,
+                    'STEM_JEOL_ADF1_03-16-20_Wangoh_LSTO_-_STO_0.25_TEM_012020_LO_0_031020_0004_1': 3,
+                    'STEM_JEOL_ADF1_03-16-20_Wangoh_LSTO_-_STO_0.25_TEM_012020_LO_0_031020_0003': 4,
+                    'STEM_JEOL_HAADF_04-27-17_13_nm_STO_p-Ge_033117_LO_110_042617_HAADF_0006': 3,
+                    'STEM_JEOL_ADF1_10-12-20_La0.8Sr0.2FeO3-STO-080317-2-LO-zero-deg_0002': 5,
+                    'STEM_JEOL_HAADF_04-27-17_13_nm_STO_p-Ge_033117_LO_110_042617_HAADF_0003': 4,
+                    'STEM_JEOL_ADF1_06-29-20_Wangoh_LSTO_-_STO_0.25_TEM_012020_LO_0_031020_Thinner_0001': 5,
+                    'STEM_JEOL_HAADF_04-27-17_13_nm_STO_p-Ge_033117_LO_110_042617_HAADF_0007': 3,
+                    'STEM_JEOL_ADF1_03-16-20_Wangoh_LSTO_-_STO_0.25_TEM_012020_LO_0_031020_0005_1': 4,
+                    'STEM_JEOL_ADF1_10-12-20_La0.8Sr0.2FeO3-STO-080317-2-LO-zero-deg_0003_1': 5,
+                    'STEM_JEOL_ADF1_03-16-20_Wangoh_LSTO_-_STO_0.25_TEM_012020_LO_0_031020_0006': 2,
+                    }
+
+    difficulty = {
+        'STEM_ADF_07-10-17 30 nm SrFeOx - LSAT 050517 LO 100 062217_0004.jpg':2,
+        'STEM_ADF_09-24-18 50 nm LMO STO 081618 LO 091618_0009.jpg':1,
+        'STEM_ADF_10-23-18 10 nm LFO-STO 120717-b LO 0 101218_0003.jpg':2,
+        'STEM_JEOL ADF1_02-12-20 Wang 5-1 LFO - SNO - LSAT 120718-6 LO 0 020420_0001.jpg':3,
+        'STEM_JEOL ADF1_03-08-21 Kaspar 30 Cr2O3 30 Fe3O4 012621A LO 21F010_0006_1':2,
+        'STEM_JEOL ADF1_04-15-19 50 nm Fe2TiO4 - MgO 012419 LO 030519 Futher Polish_0018':3,
+        'STEM_JEOL ADF1_04-15-19 50 nm Fe2TiO4 - MgO 012419 LO 030519 Futher Polish_0021':3,
+        'STEM_JEOL ADF1_07-23-19 Du STO-Ge LO 45 071919_0010':1,
+        'STEM_JEOL ADF2_07-06-20 Kaspar Hematite 1 Unirrad Uncapped 121719 19F070_0006_1':1,
+        'STEM_JEOL HAADF_04-27-17 13 nm STO p-Ge 033117 LO 110 042617 HAADF_0007':2,
+        'STO-Ge-HAADF':2
+    }
+
+    
     #Collect all performance measures
     #key : IMAGE_ALIAS, values : [iou, recall, precision, f1, fpr]
     results = {}
 
     # Iterate over the dataloader to access the images and labels
     for image, filename in dataloader:
+
+        print("processing:",filename)
         _, _, width, height = image.shape
         ROWS, COLS = int(height / IDEAL_CHIP_SIZE), int(width / IDEAL_CHIP_SIZE)
        
@@ -233,7 +311,7 @@ if __name__ == '__main__':
         IMAGE_ALIAS = IMAGE_NAME
         if '.' in IMAGE_ALIAS:
             IMAGE_ALIAS = IMAGE_ALIAS.split('.')[0]
-        LABEL_PATH = './labels/' + IMAGE_ALIAS
+        LABEL_PATH =  './CHESS_Labeling_Round_1/12-15-23_Spurgeon_CHESS_Labeling_Round_1/labels/' + IMAGE_ALIAS   # './FOR_LABELING/Labels/' 
 
         #Initialize reulsts as none for this image
         results[IMAGE_ALIAS] = [None, None, None, None, None]
@@ -339,7 +417,8 @@ if __name__ == '__main__':
 
             masks = [mask for i, mask in enumerate(masks) if i not in expendables]  
 
-            logger.info("Post-processing time:", datetime.now() - startTime)
+            logger.info(f"Post-processing time: {datetime.now() - startTime}")
+
 
 
 
@@ -437,7 +516,7 @@ if __name__ == '__main__':
         if args.embed:
             #Cluster masks based on encodings
             startTime = datetime.now()
-            gmm = GaussianMixture(n_components=n_materials)
+            gmm = GaussianMixture(n_components=CLUSTERS)
             dbscan = DBSCAN(eps=0.5, min_samples=2)
             #labels_train = dbscan.fit_predict(np.array(encodings))
             labels_train = kmeans.fit(np.array(encodings)).labels_
@@ -447,6 +526,7 @@ if __name__ == '__main__':
             #logger.info(f"Labels: {labels}")
             #Encode masks
             color_code = {}
+            label_masks = {label:[] for label in labels_train}
             for idx,mask in enumerate(masks):
                 mask["color"] = unknown_color
                 if mask["encodings"]:
@@ -457,7 +537,7 @@ if __name__ == '__main__':
                     # left = right
                     #labels = list(gmm.predict(np.array(mask["encodings"])))
                     mask["label"] = max(set(labels), key=lambda x: labels.count(x))
-
+                    label_masks[mask['label']].append(idx)
                     if not mask["label"] in color_code.keys():
                         color_code[mask["label"]] = np.concatenate([np.random.random(3), [0.35]])
                     
@@ -477,9 +557,9 @@ if __name__ == '__main__':
             plt.xlabel('PC1')
             plt.ylabel('PC2')
             plt.title('KMeans Clustering')
-            encoding_out = log_dir + '_encodings.png'
+            encoding_out = log_dir + '_encodings.pdf'
             plt.draw()
-            plt.savefig(encoding_out)
+            plt.savefig(encoding_out, format='pdf')
             plt.close()
 
         else:
@@ -492,7 +572,10 @@ if __name__ == '__main__':
                         mask_j = masks[j]
                         if mask_j["soft_preds"] and len(mask_j["soft_preds"]) == k:
                             #logger.info(f"(Mask-{i}, Mask-{j}) \t = {torch.stack(mask_i['soft_preds'])} \t {torch.stack(mask_j['soft_preds'])}")
-                            kl_div = kl(mask_i["soft_preds"],mask_j["soft_preds"])
+                            if args.method == 'kl':
+                                kl_div = kl(mask_i["soft_preds"],mask_j["soft_preds"])
+                            elif args.method == 'emd':
+                                kl_div = emd(mask_i["soft_preds"],mask_j["soft_preds"])
                             #logger.info(f"KL-div(Mask-{i}, Mask-{j}) \t = {kl_div}")        
                             kl_adj[i].append(kl_div)
                         else:
@@ -581,27 +664,27 @@ if __name__ == '__main__':
             plt.xlabel('PC1')
             plt.ylabel('PC2')
             plt.title('KMeans Clustering')
-            encoding_out = log_dir + '_encodings.png'
+            encoding_out = log_dir + '_encodings.pdf'
             plt.draw()
-            plt.savefig(encoding_out)
+            plt.savefig(encoding_out, format='pdf')
             plt.close()
 
-            #Post-processing merge masks with similar labels
-            if args.post:
-                expendables, merged, merged_labels = [], [], []
-                for label,mask_ids in label_masks.items():
-                    if len(mask_ids) > 1:
-                        expendables += mask_ids
-                        submasks = [masks[i] for i in mask_ids]
-                        merged.append(merge_masks(submasks))
-                        merged_labels.append(label)
-                        for mask in submasks:
-                            mask["status"] = "component"
-                
-                #masks = [mask for i, mask in enumerate(masks) if i not in expendables]
-                #labels = [label for i, label in enumerate(labels) if i not in expendables]
-                masks += merged
-                labels = np.append(labels,merged_labels)
+        #Post-processing merge masks with similar labels
+        if args.post:
+            expendables, merged, merged_labels = [], [], []
+            for label,mask_ids in label_masks.items():
+                if len(mask_ids) > 1:
+                    expendables += mask_ids
+                    submasks = [masks[i] for i in mask_ids]
+                    merged.append(merge_masks(submasks))
+                    merged_labels.append(label)
+                    for mask in submasks:
+                        mask["status"] = "component"
+            
+            #masks = [mask for i, mask in enumerate(masks) if i not in expendables]
+            #labels = [label for i, label in enumerate(labels) if i not in expendables]
+            masks += merged
+            labels = np.append(labels,merged_labels)
 
 
         #Performance measure
@@ -629,6 +712,7 @@ if __name__ == '__main__':
             logger.info(f'Label {file_name} \t {mask_array.shape}')
             false_positives = []
             max_mask_size, max_mask_id, max_iou, max_rec, max_pre, max_f1 = 0,0,0,0,0,0
+            ious, recs, pres, f1s = [], [], [], []
             for i,mask in enumerate(masks):
                 if mask["status"] == "ok":
                     mask_pred = mask["segmentation"]
@@ -638,6 +722,10 @@ if __name__ == '__main__':
                     logger.info(f'MASK-{i} iou={round(iou, 4):<20} rec={round(rec, 4):<20} pre={round(pre, 4):<20} f1={round(f1,4):<20} size={max_mask_size}')
                     if iou > 0:
                         false_positives.append(mask_pred)
+                        ious.append(iou)
+                        recs.append(rec)
+                        pres.append(pre)
+                        f1s.append(f1)
                     if iou > max_iou:
                         false_positives.pop()
                         max_iou = iou
@@ -646,14 +734,19 @@ if __name__ == '__main__':
                         max_f1 = f1
                         max_mask_id = i
                         max_mask_size = mask_area
+            mean_iou = sum(ious) / len(ious) if ious else 0
+            mean_rec = sum(recs) / len(recs) if recs else 0
+            mean_pre = sum(pres) / len(pres) if pres else 0
+            mean_f1 = sum(f1s) / len(f1s) if f1s else 0
+
             fpr = compute_fpr(false_positives,mask_array)
             
             #logger.info(f'WINNER -> MASK-{max_mask_id} iou = {round(max_iou,4):<20} ')
-            logger.info(f'MAX MASK-{max_mask_id} iou={round(max_iou, 4):<20} rec={round(max_rec, 4):<20} pre={round(max_pre, 4):<20} f1={round(max_f1,4):<20} label_fpr={round(fpr,4):<20} size={max_mask_size}')
-            avg_iou += (label_area / img_area) * max_iou * 100
-            avg_pre += (label_area / img_area) * max_pre * 100
-            avg_rec += (label_area / img_area) * max_rec * 100
-            avg_f1 += (label_area / img_area) * max_f1 * 100
+            logger.info(f'MASK-{max_mask_id} m_iou={round(mean_iou, 4):<20} m_rec={round(mean_rec, 4):<20} m_pre={round(mean_pre, 4):<20} m_f1={round(mean_f1,4):<20} label_fpr={round(fpr,4):<20} size={max_mask_size}')
+            avg_iou += (label_area / img_area) * mean_iou * 100
+            avg_pre += (label_area / img_area) * mean_pre * 100
+            avg_rec += (label_area / img_area) * mean_rec * 100
+            avg_f1 += (label_area / img_area) * mean_f1 * 100
             total_fpr += (label_area / img_area) * fpr * 100 
         
         logger.info(f'SAM Avg IOU                 : {round(avg_iou,2)}%')
@@ -687,9 +780,9 @@ if __name__ == '__main__':
         plt.legend(handles, labels, loc='upper left')
         
         
-        sam_out = log_dir + '_sam.png'
+        sam_out = log_dir + '_sam.pdf'
         plt.draw()
-        plt.savefig(sam_out)
+        plt.savefig(sam_out, format='pdf')
         plt.close()
 
         for i,_ in enumerate(masks):

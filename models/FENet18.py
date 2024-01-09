@@ -7,11 +7,8 @@
 import torch
 from torch.autograd import Variable
 import torch.nn as nn
-from torch.autograd import Variable
 from torchvision import models
-
 import encoding
-import torchvision.models as resnet
 from FAPool.FAP import FAP
 
 class Net(nn.Module):
@@ -113,24 +110,24 @@ class Net(nn.Module):
         return x
 
 
-def test():
-    net = Net(nclass=23).cuda()
-    print(net)
+# def test():
+#     net = Net(nclass=23).cuda()
+#     print(net)
     
-    test=net.cpu().state_dict()
-    print('=============================================================================')
-    for key,v in test.items():
-        print(key)
-    net.cuda()
-    x = Variable(torch.randn(1,3,224,224)).cuda()
-    y = net(x)
-    print(y)
-    params = net.parameters()
-    sum = 0
-    for param in params:
-        sum += param.nelement()
-    print('Total params:', sum)
+#     test=net.cpu().state_dict()
+#     print('=============================================================================')
+#     for key,v in test.items():
+#         print(key)
+#     net.cuda()
+#     x = Variable(torch.randn(1,3,224,224)).cuda()
+#     y = net(x)
+#     print(y)
+#     params = net.parameters()
+#     sum = 0
+#     for param in params:
+#         sum += param.nelement()
+#     print('Total params:', sum)
 
 
-if __name__ == "__main__":
-    test()
+# if __name__ == "__main__":
+#     test()

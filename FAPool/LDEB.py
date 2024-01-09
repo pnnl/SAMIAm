@@ -9,7 +9,6 @@ import torch
 
 import torch.nn as nn
 from FAPool.padding_same_conv import Conv2d
-from torch.autograd import Variable
 import math
 from FAPool.util import fspecial
 

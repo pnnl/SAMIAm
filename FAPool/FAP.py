@@ -4,7 +4,7 @@
 ## Email: csfengli@mail.scut.edu.cn
 ## Copyright (c) 2019
 ##+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-import scipy.io as scio
+
 # from DeepMFS.DeepMFS_copy_new import DeepMFSGenerator
 from FAPool.LDEB import LDEB
 from FAPool.PGB import PGB
@@ -12,7 +12,6 @@ from FAPool.GDCB import GDCB
 
 import torch
 import torch.nn as nn
-from torch.autograd import Variable
 
 class FAP(nn.Module): #paper20190804-1707
     def __init__(self,opt,D=3,K=32):
