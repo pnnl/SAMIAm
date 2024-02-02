@@ -208,7 +208,7 @@ for idx,chip in pred_bad_chips.items():
     show_box(chip[1:], plt.gca())
 
 for idx,chip in missed_chip.items():
-    show_box(chip[1:], plt.gca(),edgecolor='red')
+    show_box(chip[1:], plt.gca(),linecolor='red')
 
 plt.draw()
 plt.savefig(f"pred_overlay.jpg")

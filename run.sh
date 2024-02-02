@@ -26,11 +26,10 @@ module load gcc/9.1.0
 
 
 
-
 #python supervised.py  --model=res18
 #python unsupervised.py --model=FENet --embed=0 --post=1
 
-python batch_unsupervised.py --sam=sam_vit_b_01ec64.pth --model=FENet --grid=8 --chipsize=60 --embed=1 --post=1 --method=emd
+python batch_unsupervised.py --sam=sam_vit_l_0b3195.pth --model=FENet --grid=16 --chipsize=60 --embed=1 --par=0 --dilation=1 --post=1
 
 #python hello.py
 

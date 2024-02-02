@@ -45,7 +45,9 @@ SAM = 'sam_vit_h_4b8939.pth'
 BATCH_SIZE = 1
 SUBSET_SIZE = 32
 IDEAL_CHIP_SIZE = 60
-DATA_DIR = './CHESS_Labeling_Round_1/12-15-23_Spurgeon_CHESS_Labeling_Round_1/dataset/' #'./FOR_LABELING/'  #'./chessdataset_limited/'
+DATA_DIR = './CHESS_Labeling_Round_1/12-15-23_Spurgeon_CHESS_Labeling_Round_1/dataset/' # Expert 1
+DATA_DIR = './CHESS_Labeling_Round_1/12-17-23_Doty_CHESS_Labeling_Round_1/dataset/'     # Expert 2
+DATA_DIR = './chessdataset_pychip/' # For ICML
 OUTPUT_DIR = '/logs/' + NOW + '/'
 COPY_ORIGINAL_DATA = True
 OVERLAP = 90
@@ -70,6 +72,8 @@ if __name__ == '__main__':
     SAM = args.sam
     POINTS_PER_SIDE = args.grid
     IDEAL_CHIP_SIZE = args.chipsize
+    DILATION = args.dilation
+    IOU_THRESH = args.iou_thresh
 
     OPTIONS = {
     'SAM': SAM,
@@ -87,6 +91,9 @@ if __name__ == '__main__':
     'PRED_IOU_THRESH': PRED_IOU_THRESH,
     'STABILITY_SCORE_THRESH': STABILITY_SCORE_THRESH,
     'CROP_N_POINTS_DOWNSCALE_FACTOR': CROP_N_POINTS_DOWNSCALE_FACTOR,
+    'BOUNDARY MASK DILATION':DILATION,
+    'IOU_THRESH for pairing mask and label': IOU_THRESH,
+    'Par computation (0 or 1)': args.par,
     }
 
     os.makedirs(os.path.dirname(os.path.abspath(os.getcwd()) + OUTPUT_DIR), exist_ok=True)
@@ -130,170 +137,184 @@ if __name__ == '__main__':
     dataloader = DataLoader(subset_dataset, batch_size=BATCH_SIZE, shuffle=False)
 
     #Instantiate num materials for each material
-    num_materials = {'STEM_ADF_03-07-19_20_nm_MnFe2O4_MAO_110618_1_LO_013019_0010.tiff':3,
-                     'STEM_ADF_05-08-17_Fe3-xCrxO4_MgO_No_3_041817_LO_100_050417_0002.tiff':2,
-                     'STEM_ADF_05-08-17_Fe3-xCrxO4_MgO_No_3_041817_LO_100_050417_0015.tiff':5,
-                     'STEM_ADF_07-10-17_30_nm_SrFeOx_LSAT_050517_LO_100_062217_0004.tiff':5,
-                     'STEM_ADF_07-10-17_30_nm_SrFeOx_LSAT_050517_LO_100_062217_0005.tiff':4,
-                     'STEM_ADF_07-10-17_30_nm_SrFeOx_LSAT_050517_LO_100_062217_0008.tiff':2,
-                     'STEM_ADF_09-24-18_50_nm_LMO_STO_081618_LO_091618_0003.tiff':4,
-                     'STEM_ADF_11-02-18_10_nm_LFO-STO_A_LO_0_103118_0003.tiff':3,
-                     'STEM_ADF_11-02-18_10_nm_LFO-STO_A_LO_0_103118_0004.tiff':3,
-                     'STEM_ADF_12-03-18_10_nm_LFO-STO_120717-a_LO_0_103018_0009.tiff':3,
-                     'STEM_ADF_12-07-18_10_nm_LFO_STO_120717-A_LO_0_103018_0002.tiff':3,
-                     'STEM_ADF_12-07-18_10_nm_LFO_STO_120717-B_LO_0_120518_0008.tiff':3,
-                     'STEM_ADF_12-07-18_10_nm_LFO_STO_120717-C_LO_0_110818_0002.tiff':3,
-                     'STEM_ADF_12-07-18_10_nm_LFO_STO_120717-C_LO_0_110818_0004.tiff':3,
-                     'STEM_ADF_12-07-18_10_nm_LFO_STO_120717-C_LO_0_110818_0012.tiff':3,
-                     'STEM_JEOL_ADF1_02-05-20_Wang_5-1_LFO_SNO_LSAT_120718-6_LO_0_020420_0001.tiff':4,
-                     'STEM_JEOL_ADF1_02-12-20_Wang_1-1_LFO_SNO_LSAT_011619-a_LO_0_020420_0001.tiff':5,
-                     'STEM_JEOL_ADF1_03-08-21_Kaspar_30_Cr2O3_30_Fe3O4_012621B_LO_21F010_0001_1.tiff':6,
-                     'STEM_JEOL_ADF1_03-16-20_Wangoh_LSTO_STO_0-25_TEM_012020_LO_0_031020_0004_1.tiff':2,
-                     'STEM_JEOL_ADF1_04-12-21_112820_La0-03Sr0-97Zr0-5Ti0-5O3_Ge_12_nm_LO_040521_0009_1.tiff':3,
-                     'STEM_JEOL_ADF1_04-15-19_50_nm_Fe2TiO4_MgO_012419_LO_030519_Futher_Polish_0015.tiff':4,
-                     'STEM_JEOL_ADF1_04-15-19_50_nm_Fe2TiO4_MgO_012419_LO_030519_Futher_Polish_0027.tiff':4,
-                     'STEM_JEOL_ADF1_05-17-21_Le_LNFO_LSAT_375_After_OER_102120-c_LO_051021_0002_1.tiff':4,
-                     'STEM_JEOL_ADF1_05-17-21_Le_LNFO_LSAT_375_After_OER_102120-c_LO_051021_0003_1.tiff':3,
-                     'STEM_JEOL_ADF1_05-17-21_Le_LNFO_LSAT_375_After_OER_102120-c_LO_051021_0005_1.tiff':4,
-                     'STEM_JEOL_ADF1_06-04-19_12_nm_NiMn2O4_MAO_020519_1_LO_030519_0001.tiff':5,
-                     'STEM_JEOL_ADF1_06-04-19_12_nm_NiMn2O4_MAO_020519_1_LO_030519_0005.tiff':6,
-                     'STEM_JEOL_ADF1_06-11-19_13-7_nm_CoMn2O4_MAO_021519_1_LO_022619_0005.tiff':4,
-                     'STEM_JEOL_ADF1_06-11-19_13-7_nm_CoMn2O4_MAO_021519_1_LO_022619_0007.tiff':4,
-                     'STEM_JEOL_ADF1_07-06-20_Kaspar_Hematite_1_Unirrad_Uncapped_121719_19F070_0001.tiff':3,
-                     'STEM_JEOL_ADF1_08-13-20_Wang_1-1_STO-SNO_LSAT_062620-a_LO_45_081320_0009.tiff':3,
-                     'STEM_JEOL_ADF1_08-17-20_Yano_Cr2O3_18O_070820_20F017_0001_1.tiff':5,
-                     'STEM_JEOL_ADF1_08-17-20_Yano_Cr2O3_18O_070820_20F017_0005_1.tiff':5,
-                     'STEM_JEOL_ADF1_09-04-19_STO-Ge_070919_LO_EMSL_090419_0005.tiff':4,
-                     'STEM_JEOL_ADF1_09-05-19_STO-Ge_070919_LO_EMSL_090419_Thinned_0001.tiff':3,
-                     'STEM_JEOL_ADF1_09-05-19_STO-Ge_070919_LO_EMSL_090419_Thinned_0003.tiff':5,
-                     'STEM_JEOL_ADF1_10-09-19_Fe2TiO4_062619_LO_091819_0011.tiff':3,
-                     'STEM_JEOL_ADF1_11-20-19_Scafetta_Fe2CrO4_MAO_050318_600_C_LO__111819_0004.tiff':4,
-                     'STEM_JEOL_ADF1_11-20-19_Spurgeon_60_nm_LaMnO3_STO_001_073119_LO_103019_0007.tiff':4,
-                     'STEM_JEOL_ADF1_12-10-2020-LaFeO3-STO-092917-b-LO-zero-deg-12-8-2020_0105.tiff':3,
-                     'STEM_JEOL_ADF1_12-10-2020-LaFeO3-STO-092917-b-LO-zero-deg-12-8-2020_0110_1.tiff':4,
-                     'STEM_JEOL_ADF1_12-10-2020-LaFeO3-STO-092917-b-LO-zero-deg-12-8-2020_0112_1.tiff':3,
-                     'STEM_JEOL_ADF1_12-10-2020-LaFeO3-STO-092917-b-LO-zero-deg-12-8-2020_0114_1.tiff':2,
-                     'STEM_JEOL_ADF1_12-10-2020-LaFeO3-STO-092917-b-LO-zero-deg-12-8-2020_0117_1.tiff':3,
-                     'STEM_JEOL_ADF1_12-10-2020-LaFeO3-STO-092917-b-LO-zero-deg-12-8-2020_0118_1.tiff':2,
-                     'STEM_JEOL_ADF1_12-17-20_Hematite_1_Unirrad_Uncapped19F070_LO_121719_Thinned_Followup_0010_1.tiff':2,
-                     'STEM_JEOL_ADF2_02-12-20_Wang_1-1_LFO_SNO_LSAT_011619-a_LO_0_020420_0006.tiff':4,
-                     'STEM_JEOL_ADF2_02-12-20_Wang_5-1_LFO_SNO_LSAT_120718-6_LO_0_020420_0008.tiff':4,
-                     'STEM_JEOL_ADF2_02-12-20_Wang_5-1_LFO_SNO_LSAT_120718-6_LO_0_020420_0010.tiff':5,
-                     'STEM_JEOL_ADF2_03-16-20_Wangoh_LSTO_STO_0-25_TEM_012020_LO_0_031020_0004.tiff':2,
-                     'STEM_JEOL_ADF2_04-12-21_112820_La0-03Sr0-97Zr0-5Ti0-5O3_Ge_12_nm_LO_040521_0001_1.tiff':3,
-                     'STEM_JEOL_ADF2_04-15-19_50_nm_Fe2TiO4_MgO_012419_LO_030519_Futher_Polish_0019.tiff':4,
-                     'STEM_JEOL_ADF2_05-17-21_Le_LNFO_LSAT_375_After_OER_102120-c_LO_051021_0001_2.tiff':3,
-                     'STEM_JEOL_ADF2_06-03-19_40_nm_Fe2CrO4_MAO_041118_LO_021819_0022.tiff':3,
-                     'STEM_JEOL_ADF2_06-06-19_20_nm_MnFe2O4_MAO_110618_1_LO_013019_0006.tiff':5,
-                     'STEM_JEOL_ADF2_06-11-19_13-7_nm_CoMn2O4_MAO_021519_1_LO_022619_0010.tiff':3,
-                     'STEM_JEOL_ADF2_06-11-19_13-7_nm_CoMn2O4_MAO_021519_1_LO_022619_0012.tiff':3,
-                     'STEM_JEOL_ADF2_07-03-19_12_nm_NiMn2O4_MAO_020519_1_LO_030519_Longer_Bake_0006.tiff':4,
-                     'STEM_JEOL_ADF2_07-03-19_12_nm_NiMn2O4_MAO_020519_1_LO_030519_Longer_Bake_0012.tiff':3,
-                     'STEM_JEOL_ADF2_07-06-20_Kaspar_Hematite_1_Unirrad_Uncapped_121719_19F070_0005_1.tiff':4,
-                     'STEM_JEOL_ADF2_07-06-20_Kaspar_Hematite_1_Unirrad_Uncapped_121719_19F070_0006_1.tiff':3,
-                     'STEM_JEOL_ADF2_07-06-20_Kaspar_Hematite_Growth_2_LO_90_0004_1.tiff':2,
-                     'STEM_JEOL_ADF2_07-23-19_Du_STO-Ge_LO_45_071919_0013.tiff':3,
-                     'STEM_JEOL_ADF2_08-03-20_Wang_1-STO_1-SNO_LSAT_062620-a_LO_45_072720_0003_1.tiff':4,
-                     'STEM_JEOL_ADF2_08-13-20_Wang_1-1_STO-SNO_LSAT_062620-a_LO_45_081320_0003_2.tiff':4,
-                     'STEM_JEOL_ADF2_09-04-19_STO-Ge_070919_LO_EMSL_090419_0006.tiff':3,
-                     'STEM_JEOL_ADF2_10-09-19_Fe2TiO4_062619_LO_091819_0008.tiff':5,
-                     'STEM_JEOL_ADF2_10-09-19_Fe2TiO4_062619_LO_091819_0010.tiff':3,
-                     'STEM_JEOL_ADF2_10-09-19_Fe2TiO4_062619_LO_091819_0012.tiff':3,
-                     'STEM_JEOL_ADF2_10-09-19_Fe2TiO4_062619_LO_091819_0016.tiff':3,
-                     'STEM_JEOL_ADF2_10-12-20_La0-8Sr0-2FeO3-STO-080317-2-LO-zero-deg_0003_2.tiff':3,
-                     'STEM_JEOL_ADF2_10-12-20_La0-8Sr0-2FeO3-STO-080317-2-LO-zero-deg_0005_2.tiff':2,
-                     'STEM_JEOL_ADF2_11-20-19_Spurgeon_60_nm_LaMnO3_STO_001_073119_LO_103019_0012.tiff':3,
-                     'STEM_JEOL_ADF2_12-04-20_100_nm_Fe3O4_10_nm_Cr2O3_Al2O3_111120B_LO_120120_0004_2.tiff':5,
-                     'STEM_JEOL_ADF2_12-04-20_100_nm_Fe3O4_10_nm_Cr2O3_Al2O3_111120B_LO_120120_0006_2.tiff':5,
-                     'STEM_JEOL_ADF2_12-04-20_100_nm_Fe3O4_10_nm_Cr2O3_Al2O3_111120B_LO_120120_0009_2.tiff':3,
-                     'STEM_JEOL_ADF2_12-10-2020-LaFeO3-STO-092917-b-LO-zero-deg-12-8-2020_0116_2.tiff':3,
-                     'STEM_JEOL_ADF2_12-10-2020-LaFeO3-STO-092917-b-LO-zero-deg-12-8-2020_0118_2.tiff':2,
-                     'STEM_JEOL_ADF2_12-17-20_Hematite_1_Unirrad_Uncapped19F070_LO_121719_Thinned_Followup_0001_2.tiff':6,
-                     'STEM_JEOL_ADF2_12-17-20_Hematite_1_Unirrad_Uncapped19F070_LO_121719_Thinned_Followup_0003_2.tiff':5,
-                     'STEM_JEOL_ADF2_12-17-20_Hematite_1_Unirrad_Uncapped19F070_LO_121719_Thinned_Followup_0012_2.tiff':5,
-                     'STEM_JEOL_ADF2_12-17-20_Hematite_1_Unirrad_Uncapped19F070_LO_121719_Thinned_Followup_0013_2.tiff':4,
-                     'STEM_JEOL_ADF2_12-17-20_Hematite_1_Unirrad_Uncapped19F070_LO_121719_Thinned_Followup_0017_2.tiff':5,
-                     'STEM_JEOL_ADF2_12-17-20_Hematite_1_Unirrad_Uncapped19F070_LO_121719_Thinned_Followup_0017_2.jpg':5,
-                     'STO_GE_2.jpg':3,
-                     'STEM_JEOL_BF_03-08-21_Kaspar_30_Cr2O3_30_Fe3O4_012621A_LO_21F010_0002.tiff':6,
-                     'STEM_JEOL_BF_03-08-21_Kaspar_30_Cr2O3_30_Fe3O4_012621A_LO_21F010_0007.tiff':2,
-                     'STEM_JEOL_BF_08-13-20_Wang_1-1_STO-SNO_LSAT_062620-a_LO_45_081320_0004_1_2.tiff':3,
-                     'STEM_JEOL_BF_08-13-20_Wang_1-1_STO-SNO_LSAT_062620-a_LO_45_081320_0007.tiff':3,
-                     'STEM_JEOL_BF_08-13-20_Wang_1-1_STO-SNO_LSAT_062620-a_LO_45_081320_0008_2.tiff':3,
-                     'STEM_JEOL_BF_08-13-20_Wang_1-1_STO-SNO_LSAT_062620-a_LO_45_081320_0010.tiff':2,
-                     'STEM_JEOL_BF_08-13-20_Wang_1-1_STO-SNO_LSAT_062620-a_LO_45_081320_0011_1.tiff':3,
-                     'STEM_JEOL_BF_12-04-20_100_nm_Fe3O4_10_nm_Cr2O3_Al2O3_111120B_LO_120120_0001.tiff':5,
-                     'STEM_JEOL_BF_12-04-20_100_nm_Fe3O4_10_nm_Cr2O3_Al2O3_111120B_LO_120120_0004.tiff':5,
-                     'STEM_JEOL_BF_12-04-20_100_nm_Fe3O4_10_nm_Cr2O3_Al2O3_111120B_LO_120120_0005.tiff':5,
-                     'STEM_JEOL_BF_12-04-20_100_nm_Fe3O4_10_nm_Cr2O3_Al2O3_111120B_LO_120120_0010.tiff':3,
-                     'STEM_JEOL_BF_12-10-2020-LaFeO3-STO-092917-b-LO-zero-deg-12-8-2020_0110.tiff':4,
-                     'STEM_JEOL_BF_12-10-2020-LaFeO3-STO-092917-b-LO-zero-deg-12-8-2020_0116.tiff':3,
-                     'STEM_JEOL_BF_12-17-20_Hematite_1_Unirrad_Uncapped19F070_LO_121719_Thinned_Followup_0007.tiff':5,
-                     'STEM_JEOL_BF_12-17-20_Hematite_1_Unirrad_Uncapped19F070_LO_121719_Thinned_Followup_0013.tiff':5,
-                     'STEM_JEOL_HAADF_04-27-17_13_nm_STO_p-Ge_033117_LO_110_042617_HAADF_0007.tiff':3,
-                     'STEM_JEOL_HAADF_05-02-17_5_uc_STO_p-Ge_033117_LO_110_051116_HAADF_0007.tiff':3,
-                     'STEM_ADF_07-10-17 30 nm SrFeOx - LSAT 050517 LO 100 062217_0004.jpg':5,
-                     'STEM_ADF_09-24-18 50 nm LMO STO 081618 LO 091618_0009.jpg':2,
-                     'STEM_ADF_10-23-18 10 nm LFO-STO 120717-b LO 0 101218_0003.jpg':4,
-                     'STEM_JEOL ADF1_02-12-20 Wang 5-1 LFO - SNO - LSAT 120718-6 LO 0 020420_0001.jpg':3,
-                     'STEM_JEOL ADF1_03-08-21 Kaspar 30 Cr2O3 30 Fe3O4 012621A LO 21F010_0006_1':4,
-                     'STEM_JEOL ADF1_04-15-19 50 nm Fe2TiO4 - MgO 012419 LO 030519 Futher Polish_0018':3,
-                     'STEM_JEOL ADF1_04-15-19 50 nm Fe2TiO4 - MgO 012419 LO 030519 Futher Polish_0021':2,
-                     'STEM_JEOL ADF1_07-23-19 Du STO-Ge LO 45 071919_0010':3,
-                     'STEM_JEOL ADF2_07-06-20 Kaspar Hematite 1 Unirrad Uncapped 121719 19F070_0006_1':3,
-                     'STEM_JEOL HAADF_04-27-17 13 nm STO p-Ge 033117 LO 110 042617 HAADF_0007':3,
-                     'STO-Ge-HAADF':3
-                     }
-
+    #Expert 1:
     num_materials = {
-                    'STEM_ADF_11-02-18_10_nm_LFO-STO_A_LO_0_103118_0002': 3,
-                    'STEM_JEOL_HAADF_04-27-17_13_nm_STO_p-Ge_033117_LO_110_042617_HAADF_0001': 4,
-                    'STEM_JEOL_ADF1_02-20-20_Yingge_4nm_WO3_-_NbSTO_052617_LO_020620_0005': 3,
-                    'STEM_JEOL_ADF1_02-20-20_Yingge_4nm_WO3_-_NbSTO_052617_LO_020620_0001': 3,
-                    'STEM_JEOL_ADF1_10-12-20_La0.8Sr0.2FeO3-STO-080317-2-LO-zero-deg_0006_1': 6,
-                    'STEM_ADF_11-02-18_10_nm_LFO-STO_A_LO_0_103118_0001': 3,
-                    'STEM_JEOL_ADF1_02-20-20_Yingge_4nm_WO3_-_NbSTO_052617_LO_020620_0002': 3,
-                    'STEM_ADF_09-24-18_30_nm_LMO_STO_081317B_LO_091618_0004': 3,
-                    'STEM_JEOL_ADF1_06-29-20_Wangoh_LSTO_-_STO_0.25_TEM_012020_LO_0_031020_Thinner_0002': 4,
-                    'STEM_JEOL_ADF1_06-29-20_Wangoh_LSTO_-_STO_0.25_TEM_012020_LO_0_031020_Thinner_0004': 3,
-                    'STEM_JEOL_ADF1_03-16-20_Wangoh_LSTO_-_STO_0.25_TEM_012020_LO_0_031020_0001': 5,
-                    'STEM_JEOL_ADF1_10-12-20_La0.8Sr0.2FeO3-STO-080317-2-LO-zero-deg_0004_1': 6,
-                    'STEM_ADF_11-02-18_10_nm_LFO-STO_A_LO_0_103118_0004': 4,
-                    'STEM_JEOL_ADF1_03-16-20_Wangoh_LSTO_-_STO_0.25_TEM_012020_LO_0_031020_0002': 4,
-                    'STEM_JEOL_ADF1_10-12-20_La0.8Sr0.2FeO3-STO-080317-2-LO-zero-deg_0001_1': 5,
-                    'STEM_ADF_09-24-18_30_nm_LMO_STO_081317B_LO_091618_0006': 3,
-                    'STEM_ADF_09-24-18_30_nm_LMO_STO_081317B_LO_091618_0008': 3,
-                    'STEM_JEOL_ADF1_10-12-20_La0.8Sr0.2FeO3-STO-080317-2-LO-zero-deg_0005_1': 3,
-                    'STEM_ADF_09-24-18_30_nm_LMO_STO_081317B_LO_091618_0005': 3,
-                    'STEM_ADF_11-02-18_10_nm_LFO-STO_A_LO_0_103118_0003': 3,
-                    'STEM_JEOL_ADF1_06-29-20_Wangoh_LSTO_-_STO_0.25_TEM_012020_LO_0_031020_Thinner_0003_1': 4,
-                    'STEM_JEOL_HAADF_04-27-17_13_nm_STO_p-Ge_033117_LO_110_042617_HAADF_0005': 3,
-                    'STEM_JEOL_ADF1_03-16-20_Wangoh_LSTO_-_STO_0.25_TEM_012020_LO_0_031020_0004_1': 3,
-                    'STEM_JEOL_ADF1_03-16-20_Wangoh_LSTO_-_STO_0.25_TEM_012020_LO_0_031020_0003': 4,
-                    'STEM_JEOL_HAADF_04-27-17_13_nm_STO_p-Ge_033117_LO_110_042617_HAADF_0006': 3,
-                    'STEM_JEOL_ADF1_10-12-20_La0.8Sr0.2FeO3-STO-080317-2-LO-zero-deg_0002': 5,
-                    'STEM_JEOL_HAADF_04-27-17_13_nm_STO_p-Ge_033117_LO_110_042617_HAADF_0003': 4,
-                    'STEM_JEOL_ADF1_06-29-20_Wangoh_LSTO_-_STO_0.25_TEM_012020_LO_0_031020_Thinner_0001': 5,
-                    'STEM_JEOL_HAADF_04-27-17_13_nm_STO_p-Ge_033117_LO_110_042617_HAADF_0007': 3,
-                    'STEM_JEOL_ADF1_03-16-20_Wangoh_LSTO_-_STO_0.25_TEM_012020_LO_0_031020_0005_1': 4,
-                    'STEM_JEOL_ADF1_10-12-20_La0.8Sr0.2FeO3-STO-080317-2-LO-zero-deg_0003_1': 5,
-                    'STEM_JEOL_ADF1_03-16-20_Wangoh_LSTO_-_STO_0.25_TEM_012020_LO_0_031020_0006': 2,
+                    "STEM_ADF_11-02-18_10_nm_LFO-STO_A_LO_0_103118_0002":3,
+                    "STEM_JEOL_HAADF_04-27-17_13_nm_STO_p-Ge_033117_LO_110_042617_HAADF_0001":4,
+                    "STEM_JEOL_ADF1_02-20-20_Yingge_4nm_WO3_-_NbSTO_052617_LO_020620_0005":3,
+                    "STEM_JEOL_ADF1_10-12-20_La0-8Sr0-2FeO3-STO-080317-2-LO-zero-deg_0004_1":4,
+                    "STEM_JEOL_ADF1_02-20-20_Yingge_4nm_WO3_-_NbSTO_052617_LO_020620_0001":3,
+                    "STEM_ADF_11-02-18_10_nm_LFO-STO_A_LO_0_103118_0001":3,
+                    "STEM_JEOL_ADF1_02-20-20_Yingge_4nm_WO3_-_NbSTO_052617_LO_020620_0002":3,
+                    "STEM_ADF_09-24-18_30_nm_LMO_STO_081317B_LO_091618_0004":3,
+                    "STEM_JEOL_ADF1_03-16-20_Wangoh_LSTO_-_STO_0-25_TEM_012020_LO_0_031020_0005_1":3,
+                    "STEM_JEOL_ADF1_03-16-20_Wangoh_LSTO_-_STO_0-25_TEM_012020_LO_0_031020_0001":4,
+                    "STEM_JEOL_ADF1_10-12-20_La0-8Sr0-2FeO3-STO-080317-2-LO-zero-deg_0001_1":4,
+                    "STEM_JEOL_ADF1_10-12-20_La0-8Sr0-2FeO3-STO-080317-2-LO-zero-deg_0005_1":3,
+                    "STEM_ADF_11-02-18_10_nm_LFO-STO_A_LO_0_103118_0004":4,
+                    "STEM_JEOL_ADF1_03-16-20_Wangoh_LSTO_-_STO_0-25_TEM_012020_LO_0_031020_0003":4,
+                    "STEM_JEOL_ADF1_06-29-20_Wangoh_LSTO_-_STO_0-25_TEM_012020_LO_0_031020_Thinner_0004":3,
+                    "STEM_JEOL_ADF1_03-16-20_Wangoh_LSTO_-_STO_0-25_TEM_012020_LO_0_031020_0002":4,
+                    "STEM_JEOL_ADF1_03-16-20_Wangoh_LSTO_-_STO_0-25_TEM_012020_LO_0_031020_0006":2,
+                    "STEM_JEOL_ADF1_06-29-20_Wangoh_LSTO_-_STO_0-25_TEM_012020_LO_0_031020_Thinner_0002":4,
+                    "STEM_ADF_09-24-18_30_nm_LMO_STO_081317B_LO_091618_0006":3,
+                    "STEM_ADF_09-24-18_30_nm_LMO_STO_081317B_LO_091618_0008":3,
+                    "STEM_JEOL_ADF1_10-12-20_La0-8Sr0-2FeO3-STO-080317-2-LO-zero-deg_0002":4,
+                    "STEM_JEOL_ADF1_06-29-20_Wangoh_LSTO_-_STO_0-25_TEM_012020_LO_0_031020_Thinner_0003_1":4,
+                    "STEM_ADF_09-24-18_30_nm_LMO_STO_081317B_LO_091618_0005":3,
+                    "STEM_ADF_11-02-18_10_nm_LFO-STO_A_LO_0_103118_0003":3,
+                    "STEM_JEOL_HAADF_04-27-17_13_nm_STO_p-Ge_033117_LO_110_042617_HAADF_0005":3,
+                    "STEM_JEOL_ADF1_03-16-20_Wangoh_LSTO_-_STO_0-25_TEM_012020_LO_0_031020_0004_1":3,
+                    "STEM_JEOL_HAADF_04-27-17_13_nm_STO_p-Ge_033117_LO_110_042617_HAADF_0006":3,
+                    "STEM_JEOL_HAADF_04-27-17_13_nm_STO_p-Ge_033117_LO_110_042617_HAADF_0003":4,
+                    "STEM_JEOL_ADF1_10-12-20_La0-8Sr0-2FeO3-STO-080317-2-LO-zero-deg_0003_1":4,
+                    "STEM_JEOL_ADF1_10-12-20_La0-8Sr0-2FeO3-STO-080317-2-LO-zero-deg_0006_1":2,
+                    "STEM_JEOL_HAADF_04-27-17_13_nm_STO_p-Ge_033117_LO_110_042617_HAADF_0007":3,
+                    "STEM_JEOL_ADF1_06-29-20_Wangoh_LSTO_-_STO_0-25_TEM_012020_LO_0_031020_Thinner_0001":4,
                     }
 
-    difficulty = {
-        'STEM_ADF_07-10-17 30 nm SrFeOx - LSAT 050517 LO 100 062217_0004.jpg':2,
-        'STEM_ADF_09-24-18 50 nm LMO STO 081618 LO 091618_0009.jpg':1,
-        'STEM_ADF_10-23-18 10 nm LFO-STO 120717-b LO 0 101218_0003.jpg':2,
-        'STEM_JEOL ADF1_02-12-20 Wang 5-1 LFO - SNO - LSAT 120718-6 LO 0 020420_0001.jpg':3,
-        'STEM_JEOL ADF1_03-08-21 Kaspar 30 Cr2O3 30 Fe3O4 012621A LO 21F010_0006_1':2,
-        'STEM_JEOL ADF1_04-15-19 50 nm Fe2TiO4 - MgO 012419 LO 030519 Futher Polish_0018':3,
-        'STEM_JEOL ADF1_04-15-19 50 nm Fe2TiO4 - MgO 012419 LO 030519 Futher Polish_0021':3,
-        'STEM_JEOL ADF1_07-23-19 Du STO-Ge LO 45 071919_0010':1,
-        'STEM_JEOL ADF2_07-06-20 Kaspar Hematite 1 Unirrad Uncapped 121719 19F070_0006_1':1,
-        'STEM_JEOL HAADF_04-27-17 13 nm STO p-Ge 033117 LO 110 042617 HAADF_0007':2,
-        'STO-Ge-HAADF':2
+    mixin_coeef = {
+        "STEM_ADF_11-02-18_10_nm_LFO-STO_A_LO_0_103118_0002":{},
+        "STEM_JEOL_HAADF_04-27-17_13_nm_STO_p-Ge_033117_LO_110_042617_HAADF_0001":{'task-12-annotation-20-by-2-tag-Ge-10.png':10,'task-12-annotation-20-by-2-tag-PtC-10.png':10,'task-12-annotation-20-by-2-tag-SrTiO3-1.png':1,'task-12-annotation-20-by-2-tag-Vac-10.png':10},
+        "STEM_JEOL_ADF1_02-20-20_Yingge_4nm_WO3_-_NbSTO_052617_LO_020620_0005":{},
+        "STEM_JEOL_ADF1_10-12-20_La0-8Sr0-2FeO3-STO-080317-2-LO-zero-deg_0004_1":{'SrTiO3-merged-2.png':10,'task-30-annotation-34-by-2-tag-LSFO1-1.png':1,'task-30-annotation-34-by-2-tag-LSFO2-1.png':1,'task-30-annotation-34-by-2-tag-PtC-2.png':10},
+        "STEM_JEOL_ADF1_02-20-20_Yingge_4nm_WO3_-_NbSTO_052617_LO_020620_0001":{},
+        "STEM_ADF_11-02-18_10_nm_LFO-STO_A_LO_0_103118_0001":{},
+        "STEM_JEOL_ADF1_02-20-20_Yingge_4nm_WO3_-_NbSTO_052617_LO_020620_0002":{'task-10-annotation-14-by-2-tag-PtC-10.png':10,'task-10-annotation-14-by-2-tag-SrTiO3-10.png':10,'task-10-annotation-14-by-2-tag-WO3-1.png':1},
+        "STEM_ADF_09-24-18_30_nm_LMO_STO_081317B_LO_091618_0004":{},
+        "STEM_JEOL_ADF1_03-16-20_Wangoh_LSTO_-_STO_0-25_TEM_012020_LO_0_031020_0005_1":{'La-merged-2.png':10,'task-25-annotation-29-by-2-tag-PtC-1.png':1,'task-25-annotation-29-by-2-tag-Unk-1.png':1},
+        "STEM_JEOL_ADF1_03-16-20_Wangoh_LSTO_-_STO_0-25_TEM_012020_LO_0_031020_0001":{'PtC-merged-1.png':1,'task-21-annotation-26-by-2-tag-La-SrTiO3-1.png':1,'task-21-annotation-26-by-2-tag-SrTiO3-2.png':10,'task-21-annotation-26-by-2-tag-Vac-2.png':10},
+        "STEM_JEOL_ADF1_10-12-20_La0-8Sr0-2FeO3-STO-080317-2-LO-zero-deg_0001_1":{},
+        "STEM_JEOL_ADF1_10-12-20_La0-8Sr0-2FeO3-STO-080317-2-LO-zero-deg_0005_1":{'task-31-annotation-35-by-2-tag-LSFO1-1.png':1,'task-31-annotation-35-by-2-tag-LSFO2-1.png':1,'task-31-annotation-35-by-2-tag-SrTiO3-2.png':10},
+        "STEM_ADF_11-02-18_10_nm_LFO-STO_A_LO_0_103118_0004":{'task-4-annotation-8-by-2-tag-LaFeO3-1.png':1,'task-4-annotation-8-by-2-tag-PtC-10.png':10,'task-4-annotation-8-by-2-tag-SrTiO3-10.png':10,'task-4-annotation-8-by-2-tag-Vac-10.png':10},
+        "STEM_JEOL_ADF1_03-16-20_Wangoh_LSTO_-_STO_0-25_TEM_012020_LO_0_031020_0003":{'task-23-annotation-27-by-2-tag-La-SrTiO3-1.png':1,'task-23-annotation-27-by-2-tag-PtC-10.png':10,'task-23-annotation-27-by-2-tag-SrTiO3-10.png':10,'task-23-annotation-27-by-2-tag-Vac-10.png':10},
+        "STEM_JEOL_ADF1_06-29-20_Wangoh_LSTO_-_STO_0-25_TEM_012020_LO_0_031020_Thinner_0004":{},
+        "STEM_JEOL_ADF1_03-16-20_Wangoh_LSTO_-_STO_0-25_TEM_012020_LO_0_031020_0002":{'task-22-annotation-25-by-2-tag-La-SrTiO3-1.png':1,'task-22-annotation-25-by-2-tag-PtC-10.png':10,'task-22-annotation-25-by-2-tag-SrTiO3-10.png':10,'task-22-annotation-25-by-2-tag-Vac-10.png':10},
+        "STEM_JEOL_ADF1_03-16-20_Wangoh_LSTO_-_STO_0-25_TEM_012020_LO_0_031020_0006":{},
+        "STEM_JEOL_ADF1_06-29-20_Wangoh_LSTO_-_STO_0-25_TEM_012020_LO_0_031020_Thinner_0002":{},
+        "STEM_ADF_09-24-18_30_nm_LMO_STO_081317B_LO_091618_0006":{},
+        "STEM_ADF_09-24-18_30_nm_LMO_STO_081317B_LO_091618_0008":{},
+        "STEM_JEOL_ADF1_10-12-20_La0-8Sr0-2FeO3-STO-080317-2-LO-zero-deg_0002":{},
+        "STEM_JEOL_ADF1_06-29-20_Wangoh_LSTO_-_STO_0-25_TEM_012020_LO_0_031020_Thinner_0003_1":{'task-19-annotation-23-by-2-tag-La-SrTiO3-10.png':10,'task-19-annotation-23-by-2-tag-PtC-10.png':10,'task-19-annotation-23-by-2-tag-SrTiO3-10.png':10,'task-19-annotation-23-by-2-tag-Unk-1.png':1},
+        "STEM_ADF_09-24-18_30_nm_LMO_STO_081317B_LO_091618_0005":{},
+        "STEM_ADF_11-02-18_10_nm_LFO-STO_A_LO_0_103118_0003":{},
+        "STEM_JEOL_HAADF_04-27-17_13_nm_STO_p-Ge_033117_LO_110_042617_HAADF_0005":{},
+        "STEM_JEOL_ADF1_03-16-20_Wangoh_LSTO_-_STO_0-25_TEM_012020_LO_0_031020_0004_1":{'task-24-annotation-28-by-2-tag-La-SrTiO3-10.png':10,'task-24-annotation-28-by-2-tag-PtC-10.png':10,'task-24-annotation-28-by-2-tag-SrTiO3-1.png':1},
+        "STEM_JEOL_HAADF_04-27-17_13_nm_STO_p-Ge_033117_LO_110_042617_HAADF_0006":{},
+        "STEM_JEOL_HAADF_04-27-17_13_nm_STO_p-Ge_033117_LO_110_042617_HAADF_0003":{},
+        "STEM_JEOL_ADF1_10-12-20_La0-8Sr0-2FeO3-STO-080317-2-LO-zero-deg_0003_1":{'LSFO1-merged-1.png':1,'task-29-annotation-33-by-2-tag-LSFO2-1.png':1,'task-29-annotation-33-by-2-tag-PtC-2.png':10,'task-29-annotation-33-by-2-tag-SrTiO3-2.png':10},
+        "STEM_JEOL_ADF1_10-12-20_La0-8Sr0-2FeO3-STO-080317-2-LO-zero-deg_0006_1":{'LSFO1-merged-1.png':1,'task-32-annotation-36-by-2-tag-LSFO2-1.png':1},
+        "STEM_JEOL_HAADF_04-27-17_13_nm_STO_p-Ge_033117_LO_110_042617_HAADF_0007":{},
+        "STEM_JEOL_ADF1_06-29-20_Wangoh_LSTO_-_STO_0-25_TEM_012020_LO_0_031020_Thinner_0001":{'PtC-merged-2.png':10,'task-17-annotation-21-by-2-tag-La-SrTiO3-1.png':1,'task-17-annotation-21-by-2-tag-SrTiO3-2.png':10,'task-17-annotation-21-by-2-tag-Vac-2.png':10},
     }
 
+    #Expert 2:
+
+    num_materials = {
+        "STEM_ADF_09-24-18-50-nm-LMO-STO-081618-LO-091618_0002":4,
+        "STEM_JEOL-ADF1_12-10-2020-LaFeO3-STO-092917-b-LO-zero-deg-12-8-2020_0112_1":0,
+        "STEM_JEOL-ADF1_11-20-19-Spurgeon-60-nm-LaMnO3-STO-001-073119-LO-103019_0007":0,
+        "STEM_ADF_09-24-18-50-nm-LMO-STO-081618-LO-091618_0008":2,
+        "STEM_JEOL-ADF1_12-10-2020-LaFeO3-STO-092917-b-LO-zero-deg-12-8-2020_0109_1":0,
+        "STEM_JEOL-ADF1_03-16-20-Wangoh-LSTO-STO-0.25-TEM-012020-LO-0-031020_0001":2,
+        "STEM_JEOL-ADF1_03-16-20-Wangoh-LSTO-STO-0.25-TEM-012020-LO-0-031020_0005_1":3,
+        "STEM_JEOL-ADF1_11-20-19-Spurgeon-60-nm-LaMnO3-STO-001-073119-LO-103019_0011":0,
+        "STEM_JEOL-ADF1_11-20-19-Spurgeon-60-nm-LaMnO3-STO-001-073119-LO-103019_0015":0,
+        "STEM_JEOL-ADF1_02-20-20-Yingge-4nm-WO3-NbSTO-052617-LO-020620_0002":3,
+        "STEM_JEOL-HAADF_04-27-17-13-nm-STO-p-Ge-033117-LO-110-042617-HAADF_0006":3,
+        "STEM_JEOL-ADF1_07-23-19-Du-STO-Ge-LO-45-071919_0007":0,
+        "STEM_ADF_11-02-18-10-nm-LFO-STO-A-LO-0-103118_0003":3,
+        "STEM_JEOL-ADF1_12-10-2020-LaFeO3-STO-092917-b-LO-zero-deg-12-8-2020_0115_1":0,
+        "STEM_ADF_09-24-18-50-nm-LMO-STO-081618-LO-091618_0004":3,
+        "STEM_JEOL-ADF1_08-13-20-Wang-1-1-STO-SNO-LSAT-062620-a-LO-45-081320_0010_1":0,
+        "STEM_JEOL-ADF1_03-16-20-Wangoh-LSTO-STO-0.25-TEM-012020-LO-0-031020_0006":2,
+        "STEM_JEOL-ADF1_12-10-2020-LaFeO3-STO-092917-b-LO-zero-deg-12-8-2020_0106_1":0,
+        "STEM_JEOL-ADF1_07-23-19-Du-STO-Ge-LO-45-071919_0010":0,
+        "STEM_JEOL-ADF1_08-13-20-Wang-1-1-STO-SNO-LSAT-062620-a-LO-45-081320_0006_1":0,
+        "STEM_JEOL-ADF1_12-10-2020-LaFeO3-STO-092917-b-LO-zero-deg-12-8-2020_0117_1":0,
+        "STEM_JEOL-ADF1_12-10-2020-LaFeO3-STO-092917-b-LO-zero-deg-12-8-2020_0118_1":0,
+        "STEM_JEOL-ADF1_06-29-20-Wangoh-LSTO-STO-0.25-TEM-012020-LO-0-031020-Thinner_0003_1":3,
+        "STEM_JEOL-ADF1_08-03-20-Wang-1-STO-1-SNO-LSAT-062620-a-LO-45-072720_0001":0,
+        "STEM_JEOL-ADF1_11-20-19-Spurgeon-60-nm-LaMnO3-STO-001-073119-LO-103019_0013":0,
+        "STEM_ADF_11-02-18-10-nm-LFO-STO-A-LO-0-103118_0002":3,
+        "STEM_JEOL-ADF1_08-13-20-Wang-1-1-STO-SNO-LSAT-062620-a-LO-45-081320_0003":0,
+        "STEM_JEOL-ADF1_08-13-20-Wang-1-1-STO-SNO-LSAT-062620-a-LO-45-081320_0012":0,
+        "STEM_JEOL-ADF1_08-13-20-Wang-1-1-STO-SNO-LSAT-062620-a-LO-45-081320_0005_1":0,
+        "STEM_JEOL-ADF1_06-29-20-Wangoh-LSTO-STO-0.25-TEM-012020-LO-0-031020-Thinner_0004":3,
+        "STEM_JEOL-ADF1_11-20-19-Spurgeon-60-nm-LaMnO3-STO-001-073119-LO-103019_0009":0,
+        "STEM_JEOL-ADF1_07-23-19-Du-STO-Ge-LO-45-071919_0012":0,
+        "STEM_JEOL-ADF1_02-20-20-Yingge-4nm-WO3-NbSTO-052617-LO-020620_0005":3,
+        "STEM_JEOL-ADF1_11-20-19-Spurgeon-60-nm-LaMnO3-STO-001-073119-LO-103019_0005":0,
+        "STEM_JEOL-ADF1_08-13-20-Wang-1-1-STO-SNO-LSAT-062620-a-LO-45-081320_0008":0,
+        "STEM_JEOL-HAADF_05-02-17-5-uc-STO-p-Ge-033117-LO-110-051116-HAADF_0007":0,
+        "STEM_JEOL-ADF1_12-10-2020-LaFeO3-STO-092917-b-LO-zero-deg-12-8-2020_0105":0,
+        "STEM_JEOL-ADF1_10-12-20-La0.8Sr0.2FeO3-STO-080317-2-LO-zero-deg_0005_1":2,
+        "STEM_ADF_09-24-18-50-nm-LMO-STO-081618-LO-091618_0009":2,
+        "STEM_JEOL-HAADF_05-02-17-5-uc-STO-p-Ge-033117-LO-110-051116-HAADF_0003":0,
+        "STEM_ADF_01-12-18-4-uc-LaMnO3-072817A-LO-100-01118-EELS_0004":3,
+        "STEM_ADF_09-24-18-50-nm-LMO-STO-081618-LO-091618_0007":2,
+        "STEM_JEOL-ADF1_07-23-19-Du-STO-Ge-LO-45-071919_0001":0,
+        "STEM_JEOL-ADF1_03-16-20-Wangoh-LSTO-STO-0.25-TEM-012020-LO-0-031020_0004_1":3,
+        "STEM_JEOL-ADF1_02-20-20-Yingge-4nm-WO3-NbSTO-052617-LO-020620_0001":3,
+        "STEM_JEOL-HAADF_05-02-17-5-uc-STO-p-Ge-033117-LO-110-051116-HAADF_0005":0,
+        "STEM_JEOL-HAADF_04-27-17-13-nm-STO-p-Ge-033117-LO-110-042617-HAADF_0001":3,
+        "STEM_ADF_09-24-18-30-nm-LMO-STO-081317B-LO-091618_0006":3,
+        "STEM_JEOL-HAADF_05-02-17-5-uc-STO-p-Ge-033117-LO-110-051116-HAADF_0001":0,
+        "STEM_JEOL-HAADF_05-02-17-5-uc-STO-p-Ge-033117-LO-110-051116-HAADF_0002":0,
+        "STEM_JEOL-HAADF_04-27-17-13-nm-STO-p-Ge-033117-LO-110-042617-HAADF_0003":3,
+        "STEM_JEOL-ADF1_10-12-20-La0.8Sr0.2FeO3-STO-080317-2-LO-zero-deg_0004_1":3,
+        "STEM_JEOL-ADF1_08-13-20-Wang-1-1-STO-SNO-LSAT-062620-a-LO-45-081320_0002":0,
+        "STEM_JEOL-ADF1_12-10-2020-LaFeO3-STO-092917-b-LO-zero-deg-12-8-2020_0119_1":0,
+        "STEM_JEOL-ADF1_08-13-20-Wang-1-1-STO-SNO-LSAT-062620-a-LO-45-081320_0011":0,
+        "STEM_ADF_09-24-18-50-nm-LMO-STO-081618-LO-091618_0001":4,
+        "STEM_ADF_01-15-18-2-uc-LaMnO3-070617B-LO-100-111417-EELS_0004":3,
+        "STEM_JEOL-ADF1_03-16-20-Wangoh-LSTO-STO-0.25-TEM-012020-LO-0-031020_0002":4,
+        "STEM_JEOL-ADF1_06-29-20-Wangoh-LSTO-STO-0.25-TEM-012020-LO-0-031020-Thinner_0002":4,
+        "STEM_ADF_09-24-18-50-nm-LMO-STO-081618-LO-091618_0006":3,
+        "STEM_JEOL-ADF1_08-03-20-Wang-1-STO-1-SNO-LSAT-062620-a-LO-45-072720_0002":0,
+        "STEM_JEOL-ADF1_12-10-2020-LaFeO3-STO-092917-b-LO-zero-deg-12-8-2020_0114_1":0,
+        "STEM_JEOL-HAADF_04-27-17-13-nm-STO-p-Ge-033117-LO-110-042617-HAADF_0005":3,
+        "STEM_ADF_09-24-18-50-nm-LMO-STO-081618-LO-091618_0003":3,
+        "STEM_JEOL-ADF1_03-16-20-Wangoh-LSTO-STO-0.25-TEM-012020-LO-0-031020_0003":4,
+        "STEM_ADF_01-15-18-2-uc-LaMnO3-070617B-LO-100-111417-EELS_0003":3,
+        "STEM_JEOL-ADF1_08-03-20-Wang-1-STO-1-SNO-LSAT-062620-a-LO-45-072720_0003":0,
+        "STEM_JEOL-ADF1_08-13-20-Wang-1-1-STO-SNO-LSAT-062620-a-LO-45-081320_0007_1":0,
+        "STEM_ADF_09-24-18-50-nm-LMO-STO-081618-LO-091618_0005":3,
+        "STEM_ADF_01-12-18-4-uc-LaMnO3-072817A-LO-100-01118-EELS_0006":3,
+        "STEM_JEOL-ADF1_12-10-2020-LaFeO3-STO-092917-b-LO-zero-deg-12-8-2020_0107_1":0,
+        "STEM_JEOL-ADF1_12-10-2020-LaFeO3-STO-092917-b-LO-zero-deg-12-8-2020_0116_1":0,
+        "STEM_JEOL-ADF1_08-13-20-Wang-1-1-STO-SNO-LSAT-062620-a-LO-45-081320_0001":0,
+        "STEM_JEOL-ADF1_07-23-19-Du-STO-Ge-LO-45-071919_0003":0,
+        "STEM_JEOL-ADF1_12-10-2020-LaFeO3-STO-092917-b-LO-zero-deg-12-8-2020_0108_1":0,
+        "STEM_JEOL-HAADF_05-02-17-5-uc-STO-p-Ge-033117-LO-110-051116-HAADF_0006":0,
+        "STEM_ADF_01-15-18-2-uc-LaMnO3-070617B-LO-100-111417-EELS_0002":3,
+        "STEM_JEOL-ADF1_07-23-19-Du-STO-Ge-LO-45-071919_0005":0,
+        "STEM_JEOL-ADF1_08-13-20-Wang-1-1-STO-SNO-LSAT-062620-a-LO-45-081320_0004-2":0,
+        "STEM_ADF_09-24-18-30-nm-LMO-STO-081317B-LO-091618_0004":3,
+        "STEM_JEOL-ADF1_11-20-19-Spurgeon-60-nm-LaMnO3-STO-001-073119-LO-103019_0001":0,
+        "STEM_ADF_01-12-18-4-uc-LaMnO3-072817A-LO-100-01118-EELS_0005":3,
+        "STEM_ADF_01-12-18-4-uc-LaMnO3-072817A-LO-100-01118-EELS_0003":3,
+        "STEM_JEOL-ADF1_12-10-2020-LaFeO3-STO-092917-b-LO-zero-deg-12-8-2020_0110_1":0,
+        "STEM_JEOL-ADF1_10-12-20-La0.8Sr0.2FeO3-STO-080317-2-LO-zero-deg_0002":4,
+        "STEM_JEOL-ADF1_06-29-20-Wangoh-LSTO-STO-0.25-TEM-012020-LO-0-031020-Thinner_0001":4,
+        "STEM_ADF_11-02-18-10-nm-LFO-STO-A-LO-0-103118_0001":3,
+        "STEM_JEOL-ADF1_10-12-20-La0.8Sr0.2FeO3-STO-080317-2-LO-zero-deg_0001_1":4,
+        "STEM_JEOL-ADF1_10-12-20-La0.8Sr0.2FeO3-STO-080317-2-LO-zero-deg_0006_1":2,
+        "STEM_ADF_09-24-18-30-nm-LMO-STO-081317B-LO-091618_0005":3,
+        "STEM_JEOL-ADF1_12-10-2020-LaFeO3-STO-092917-b-LO-zero-deg-12-8-2020_0120_1":0,
+        "STEM_JEOL-ADF1_08-13-20-Wang-1-1-STO-SNO-LSAT-062620-a-LO-45-081320_0009":0,
+        "STEM_JEOL-ADF1_12-10-2020-LaFeO3-STO-092917-b-LO-zero-deg-12-8-2020_0111_1":0,
+        "STEM_JEOL-ADF1_10-12-20-La0.8Sr0.2FeO3-STO-080317-2-LO-zero-deg_0003_1":3,
+        "STEM_ADF_11-02-18-10-nm-LFO-STO-A-LO-0-103118_0004":3,
+        "STEM_JEOL-ADF1_12-10-2020-LaFeO3-STO-092917-b-LO-zero-deg-12-8-2020_0121_1":0,
+        "STEM_JEOL-ADF1_08-13-20-Wang-1-1-STO-SNO-LSAT-062620-a-LO-45-081320_0004_1":0,
+        "STEM_JEOL-ADF1_11-20-19-Spurgeon-60-nm-LaMnO3-STO-001-073119-LO-103019_0003":0,
+        "STEM_ADF_09-24-18-30-nm-LMO-STO-081317B-LO-091618_0008":3,
+        "STEM_ADF_01-15-18-2-uc-LaMnO3-070617B-LO-100-111417-EELS_0001":3,
+        "STEM_ADF_01-12-18-4-uc-LaMnO3-072817A-LO-100-01118-EELS_0007":3,
+        "STEM_JEOL-HAADF_04-27-17-13-nm-STO-p-Ge-033117-LO-110-042617-HAADF_0007":3,
+        "STEM_JEOL-ADF1_08-03-20-Wang-1-STO-1-SNO-LSAT-062620-a-LO-45-072720_0004_1":0,
+    }
     
     #Collect all performance measures
     #key : IMAGE_ALIAS, values : [iou, recall, precision, f1, fpr]
@@ -311,7 +332,9 @@ if __name__ == '__main__':
         IMAGE_ALIAS = IMAGE_NAME
         if '.' in IMAGE_ALIAS:
             IMAGE_ALIAS = IMAGE_ALIAS.split('.')[0]
-        LABEL_PATH =  './CHESS_Labeling_Round_1/12-15-23_Spurgeon_CHESS_Labeling_Round_1/labels/' + IMAGE_ALIAS   # './FOR_LABELING/Labels/' 
+        LABEL_PATH =  './CHESS_Labeling_Round_1/12-15-23_Spurgeon_CHESS_Labeling_Round_1/labels_merged/' + IMAGE_ALIAS   # Expert 1
+        LABEL_PATH = './CHESS_Labeling_Round_1/12-17-23_Doty_CHESS_Labeling_Round_1/labels_merged/' + IMAGE_ALIAS  # Expert 2
+        LABEL_PATH = './pychip_labels/' + IMAGE_ALIAS # For ICML
 
         #Initialize reulsts as none for this image
         results[IMAGE_ALIAS] = [None, None, None, None, None]
@@ -320,7 +343,9 @@ if __name__ == '__main__':
         torch.cuda.empty_cache()
 
         print('IMAGE:',IMAGE_NAME)
-        CLUSTERS = num_materials[IMAGE_NAME] if IMAGE_NAME in num_materials.keys() else 0
+        image_name, image_ext = os.path.splitext(IMAGE_NAME)
+        CLUSTERS = num_materials[image_name] if image_name in num_materials.keys() else 3
+        print(f'{image_name}: clusters {"" if image_name in num_materials.keys() else "not"} found!')
 
         #Prepare logfile
         log_dir = os.path.abspath(os.getcwd()) + OUTPUT_DIR + IMAGE_ALIAS + '/'
@@ -368,7 +393,7 @@ if __name__ == '__main__':
 
         #Post-processing mask filtering
         #Remove tiny component masks inside a compund mask if sum of compnent masks < 50% of compund mask
-        #Remove compund mask if component masks makeup >= 50% of compund mask
+        #Remove compund mask if component masks makeup >= 70% of compund mask
         if args.post:
             startTime = datetime.now()
             mask_tree = {i:{"children":[], "redundant":[]} for i, _ in enumerate(masks)}
@@ -508,12 +533,12 @@ if __name__ == '__main__':
                 logger.info(f"Mask-{idx} \t preds: {len(mask['soft_preds'])}")
         logger.info(f"{'Encode' if args.embed else 'Soft-pred'} k-masks: {datetime.now() - startTime}")
 
-        n_materials = 3 #len(masks)
+        n_materials = CLUSTERS #len(masks)
         kmeans = KMeans(n_clusters=n_materials)
         unknown_color = np.concatenate([np.random.random(3), [0.35]])
         color_code = {'unknown':unknown_color}
 
-        if args.embed:
+        if args.post and args.embed:
             #Cluster masks based on encodings
             startTime = datetime.now()
             gmm = GaussianMixture(n_components=CLUSTERS)
@@ -557,12 +582,12 @@ if __name__ == '__main__':
             plt.xlabel('PC1')
             plt.ylabel('PC2')
             plt.title('KMeans Clustering')
-            encoding_out = log_dir + '_encodings.pdf'
+            encoding_out = log_dir + '_encodings.pdf' if args.saveformat == 'pdf' else log_dir + '_encodings.png'
             plt.draw()
-            plt.savefig(encoding_out, format='pdf')
+            plt.savefig(encoding_out, bbox_inches='tight', pad_inches=0, format='pdf' if args.saveformat == 'pdf' else 'png')
             plt.close()
 
-        else:
+        elif args.post and not args.embed:
             startTime = datetime.now()
             kl_adj = {i:[] for i in range(len(masks))}
             for i in range(len(masks)):
@@ -664,13 +689,13 @@ if __name__ == '__main__':
             plt.xlabel('PC1')
             plt.ylabel('PC2')
             plt.title('KMeans Clustering')
-            encoding_out = log_dir + '_encodings.pdf'
+            encoding_out = log_dir + '_encodings.pdf' if args.saveformat == 'pdf' else log_dir + '_encodings.png'
             plt.draw()
-            plt.savefig(encoding_out, format='pdf')
+            plt.savefig(encoding_out, bbox_inches='tight', pad_inches=0, format='pdf' if args.saveformat == 'pdf' else 'png')
             plt.close()
 
-        #Post-processing merge masks with similar labels
-        if args.post:
+        #Post-processing merge masks with similar labels 
+        if args.post and len(masks) > CLUSTERS:
             expendables, merged, merged_labels = [], [], []
             for label,mask_ids in label_masks.items():
                 if len(mask_ids) > 1:
@@ -685,10 +710,14 @@ if __name__ == '__main__':
             #labels = [label for i, label in enumerate(labels) if i not in expendables]
             masks += merged
             labels = np.append(labels,merged_labels)
-
+        elif len(masks) <= CLUSTERS:
+            print(f'Avoided merging since masks: {len(masks)} <= clusters: {CLUSTERS}')
 
         #Performance measure
         file_list = [file for file in os.listdir(LABEL_PATH) if file.endswith(".png")]
+
+        num_gt_labels = len(file_list)
+
         # Iterate through the list of .png files and load them as PIL Image objects
         avg_iou, avg_pre, avg_rec, avg_f1, total_fpr = 0, 0, 0, 0, 0
         for file_name in file_list:
@@ -717,37 +746,51 @@ if __name__ == '__main__':
                 if mask["status"] == "ok":
                     mask_pred = mask["segmentation"]
                     mask_area = mask["area"]
-                    iou, rec, pre, f1 = calculate_metrics(mask_pred,mask_array)
-                    #logger.info(f'\tMASK-{i} iou={round(iou,2)},\t acc={round(acc,2)},\t rec={round(rec,2)},\t pre={round(pre,2)},\t f1={f1}')
-                    logger.info(f'MASK-{i} iou={round(iou, 4):<20} rec={round(rec, 4):<20} pre={round(pre, 4):<20} f1={round(f1,4):<20} size={max_mask_size}')
-                    if iou > 0:
+                    # Convert the grayscale values to binary (0 or 1)
+                    mask_pred = (mask_pred > 0).astype(np.uint8)
+                    if  exceeds_iou_threshold(mask_pred,mask_array, IOU_THRESH): #intersects(mask_pred,mask_array):
+                        #Convert to boundary mask and recompute metrics if dilation < 1
+                        if DILATION < 1:
+                            mask_array = mask_to_boundary(mask_array,DILATION)
+                            mask_pred = mask_to_boundary(mask_pred,DILATION)
+                        #Compute metrics
+                        iou, rec, pre, f1 = calculate_metrics(mask_pred,mask_array)
+                        logger.info(f'MASK-{i} iou={round(iou, 4):<20} rec={round(rec, 4):<20} pre={round(pre, 4):<20} f1={round(f1,4):<20} size={max_mask_size}')
                         false_positives.append(mask_pred)
                         ious.append(iou)
                         recs.append(rec)
                         pres.append(pre)
                         f1s.append(f1)
-                    if iou > max_iou:
-                        false_positives.pop()
-                        max_iou = iou
-                        max_rec = rec
-                        max_pre = pre
-                        max_f1 = f1
-                        max_mask_id = i
-                        max_mask_size = mask_area
+                        if iou > max_iou:
+                            false_positives.pop()
+                            max_iou = iou
+                            max_rec = rec
+                            max_pre = pre
+                            max_f1 = f1
+                            max_mask_id = i
+                            max_mask_size = mask_area
             mean_iou = sum(ious) / len(ious) if ious else 0
             mean_rec = sum(recs) / len(recs) if recs else 0
             mean_pre = sum(pres) / len(pres) if pres else 0
             mean_f1 = sum(f1s) / len(f1s) if f1s else 0
 
             fpr = compute_fpr(false_positives,mask_array)
-            
+
             #logger.info(f'WINNER -> MASK-{max_mask_id} iou = {round(max_iou,4):<20} ')
             logger.info(f'MASK-{max_mask_id} m_iou={round(mean_iou, 4):<20} m_rec={round(mean_rec, 4):<20} m_pre={round(mean_pre, 4):<20} m_f1={round(mean_f1,4):<20} label_fpr={round(fpr,4):<20} size={max_mask_size}')
-            avg_iou += (label_area / img_area) * mean_iou * 100
-            avg_pre += (label_area / img_area) * mean_pre * 100
-            avg_rec += (label_area / img_area) * mean_rec * 100
-            avg_f1 += (label_area / img_area) * mean_f1 * 100
-            total_fpr += (label_area / img_area) * fpr * 100 
+            if args.par and mixin_coeef[image_name]:
+                numerator = mixin_coeef[image_name][file_name]
+                denominator = sum(mixin_coeef[image_name].values())
+                print(f'Using mixin coeef: {file_name} = {numerator}/{denominator}')
+            else:
+                numerator = 1
+                denominator = num_gt_labels
+            avg_iou += (numerator / denominator) * mean_iou * 100
+            avg_pre += (numerator / denominator) * mean_pre * 100
+            avg_rec += (numerator / denominator) * mean_rec * 100
+            avg_f1 += (numerator / denominator) * mean_f1 * 100
+            total_fpr += (numerator / denominator) * fpr * 100 
+
         
         logger.info(f'SAM Avg IOU                 : {round(avg_iou,2)}%')
         logger.info(f'SAM Avg PRECISION           : {round(avg_pre,2)}%')
@@ -764,25 +807,25 @@ if __name__ == '__main__':
         for idx, mask in enumerate(masks):
             if mask["status"] == "ok":
                 bbox = (mask["bbox"][0],mask["bbox"][1],mask["bbox"][0] + mask["bbox"][2],mask["bbox"][1] + mask["bbox"][3])
-                show_box(bbox, plt.gca(),f"Mask-{idx}",mask["color"])
+                show_box(bbox, plt.gca(),f"Mask-{idx}",mask["color"] if "color" in mask else [])
                 show_points(np.array(mask["point_coords"]), np.array([1]), plt.gca())
         
-        #Legend
-        # Create empty handles and labels lists
-        handles = []
-        labels = []
-        # Iterate over the colors and create proxy artists
-        for i, color in color_code.items():
-            # Create a rectangle patch as the proxy artist
-            rect = plt.Rectangle((0, 0), 1, 1, color=color)
-            handles.append(rect)
-            labels.append(f'Cluster-{i}')
-        plt.legend(handles, labels, loc='upper left')
-        
-        
-        sam_out = log_dir + '_sam.pdf'
+        if args.post:
+            #Legend
+            # Create empty handles and labels lists
+            handles = []
+            labels = []
+            # Iterate over the colors and create proxy artists
+            for i, color in color_code.items():
+                # Create a rectangle patch as the proxy artist
+                rect = plt.Rectangle((0, 0), 1, 1, color=color)
+                handles.append(rect)
+                labels.append(f'Cluster-{i}')
+            plt.legend(handles, labels, loc='upper left')
+ 
+        sam_out = log_dir + '_sam.pdf' if args.saveformat == 'pdf' else log_dir + '_sam.png'
         plt.draw()
-        plt.savefig(sam_out, format='pdf')
+        plt.savefig(sam_out, bbox_inches='tight', pad_inches=0, format='pdf' if args.saveformat == 'pdf' else 'png')
         plt.close()
 
         for i,_ in enumerate(masks):
