@@ -17,6 +17,7 @@ from models.FENet18 import Net as FENet18
 import torch.nn as nn
 import argparse
 import pickle
+from torch.utils.data import Dataset, DataLoader
 
 def get_logger():
     logging.basicConfig()
@@ -393,6 +394,29 @@ def predict_chips(images_path,model,trans='FENet'):
 
     return predictions
 
+class CropDataset(Dataset):
+    def __init__(self, directories, transform=None):
+        self.files = []
+        self.transform = transform
+
+        # Load images starting with 'R' from the given directories
+        for directory in directories:
+            for file in os.listdir(directory):
+                if file.startswith('R') and file.endswith('.jpg'):
+                    self.files.append(os.path.join(directory, file))
+
+    def __len__(self):
+        return len(self.files)
+
+    def __getitem__(self, idx):
+        img_path = self.files[idx]
+        image = Image.open(img_path).convert("RGB")
+        
+        if self.transform:
+            image = self.transform(image)
+        
+        return image
+
 def encode_chips(images_path,model,layer_index=-1,weights='IMAGENET1K_V1'):
     encodings = []
     if model == "res18":
@@ -422,7 +446,11 @@ def encode_chips(images_path,model,layer_index=-1,weights='IMAGENET1K_V1'):
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
+    # dataset = CropDataset([images_path], transform=transform)
+    # dataloader = DataLoader(dataset, batch_size=2, shuffle=True)
 
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = model.to(device)
     model.eval()
     for filename in os.listdir(images_path):
         if ".jpg" in filename:
@@ -437,7 +465,7 @@ def encode_chips(images_path,model,layer_index=-1,weights='IMAGENET1K_V1'):
             
             # Obtain the feature representation of the image
             with torch.no_grad():
-                encoding = model(image)
+                encoding = model(image.to(device))
                 encoding = encoding.view(encoding.size(0), -1)
 
             

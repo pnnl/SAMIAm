@@ -43,11 +43,11 @@ NOW = str(datetime.now()).replace(" ","--").split(".")[0]
 #Define default global variable values
 SAM = 'sam_vit_h_4b8939.pth'
 BATCH_SIZE = 1
-SUBSET_SIZE = 32
+SUBSET_SIZE = 10
 IDEAL_CHIP_SIZE = 60
 DATA_DIR = './CHESS_Labeling_Round_1/12-15-23_Spurgeon_CHESS_Labeling_Round_1/dataset/' # Expert 1
-DATA_DIR = './CHESS_Labeling_Round_1/12-17-23_Doty_CHESS_Labeling_Round_1/dataset/'     # Expert 2
-DATA_DIR = './chessdataset_pychip/' # For ICML
+#DATA_DIR = './CHESS_Labeling_Round_1/12-17-23_Doty_CHESS_Labeling_Round_1/dataset/'     # Expert 2
+#DATA_DIR = './chessdataset_pychip/' # For ICML
 OUTPUT_DIR = '/logs/' + NOW + '/'
 COPY_ORIGINAL_DATA = True
 OVERLAP = 90
@@ -333,8 +333,8 @@ if __name__ == '__main__':
         if '.' in IMAGE_ALIAS:
             IMAGE_ALIAS = IMAGE_ALIAS.split('.')[0]
         LABEL_PATH =  './CHESS_Labeling_Round_1/12-15-23_Spurgeon_CHESS_Labeling_Round_1/labels_merged/' + IMAGE_ALIAS   # Expert 1
-        LABEL_PATH = './CHESS_Labeling_Round_1/12-17-23_Doty_CHESS_Labeling_Round_1/labels_merged/' + IMAGE_ALIAS  # Expert 2
-        LABEL_PATH = './pychip_labels/' + IMAGE_ALIAS # For ICML
+        #LABEL_PATH = './CHESS_Labeling_Round_1/12-17-23_Doty_CHESS_Labeling_Round_1/labels_merged/' + IMAGE_ALIAS  # Expert 2
+        #LABEL_PATH = './pychip_labels/' + IMAGE_ALIAS # For ICML
 
         #Initialize reulsts as none for this image
         results[IMAGE_ALIAS] = [None, None, None, None, None]
