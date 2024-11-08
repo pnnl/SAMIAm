@@ -17,4 +17,4 @@ To run the provided examples, follow these steps:
 If you're using Slurm for job scheduling, you can run the segmentation process with the following command:
 
 ```bash
-sbatch -p node --gres=gpu:1 [-A allocation] run.sh
+python batch_unsupervised.py --sam=sam_vit_l_0b3195.pth --model=FENet --grid=16 --chipsize=60 --embed=1 --par=0 --dilation=1 --post=1
